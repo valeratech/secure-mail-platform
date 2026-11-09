@@ -1,0 +1,46 @@
+# Raw, unsanitized lab evidence — never committed
+evidence-working/
+**/evidence-working/
+
+# Employer/customer/production strings used by the audit — never committed
+.audit-denylist
+**/.audit-denylist
+
+# Config pulled off the lab VM, pre-review
+.sync-staging/
+
+# CA state and private key material — generated in the lab, never published
+ca/
+**/ca/
+*.key
+*-key.pem
+*.p12
+*.pfx
+*.csr
+*.srl
+
+# DKIM private keys (rspamd keygen / dkimpy / opendkim naming)
+dkim/
+*.private
+*.dkim.key
+
+# Database dumps, mail stores, and backups pulled for restore drills (Section 13)
+backups/
+*.sql.gz
+*.dump
+Maildir/
+vmail/
+
+# Lab credentials kept beside the build, never in it
+.env
+*.secret
+credentials*
+
+# script(1) timing files
+timing.log
+*.timing
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*~

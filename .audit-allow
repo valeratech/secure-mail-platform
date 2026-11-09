@@ -1,0 +1,12 @@
+# Deliberate, documented approvals for scripts/audit-sanitize.sh.
+# One entry per line. Every entry needs a reason on the line above it.
+#
+# Format: the exact string that would otherwise be flagged.
+# Inline alternative: put "audit-ok" in a source line to exempt that single line.
+#
+# Lab addressing (10.10.10.0/24), the .test namespace, and the mail-stack upstream
+# documentation hosts are approved by pattern inside the script itself.
+
+# The lab's own reverse-DNS zone for 10.10.10.0/24 (ENVIRONMENT.md, Section 3).
+# Synthetic, RFC1918-derived, and matches the approved lab subnet.
+10.10.10.in-addr.arpa
