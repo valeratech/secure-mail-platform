@@ -68,8 +68,8 @@ was actually built and verified.
 
 | # | Section | State |
 |---|---|---|
-| 1 | Architecture & scope | Revision S01-R02 submitted — awaiting Reviewer acceptance |
-| 2 | VMware environment & base OS | Gated on Section 1 |
+| 1 | Architecture & scope | **Accepted** — [S01-R03](reviews/S01-R03-reviewer.md) |
+| 2 | VMware environment & base OS | Authorized — next |
 | 3 | Internal DNS | |
 | 4 | Private CA & TLS | |
 | 5 | MariaDB & virtual-user schema | |

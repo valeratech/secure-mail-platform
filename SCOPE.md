@@ -1,10 +1,11 @@
 # Scope — release one
 
-Locked at Section 1. Anything not listed under "In scope" is deferred, including good ideas.
+Locked at Section 1 (accepted in [S01-R03](reviews/S01-R03-reviewer.md)). Anything not listed under "In scope" is deferred, including good ideas.
 Changes to this file go through the Builder/Reviewer process in [reviews/](reviews/).
 
-> **Status:** Section 1 submitted as revision S01-R02, awaiting Reviewer acceptance.
-> Section 2 is gated on that acceptance.
+> **Status:** Section 1 **accepted** (S01-R03, 2026-11-09). Section 2 authorized. Later
+> implementation failures are resolved within the section that owns the failing component;
+> they do not reopen Section 1.
 
 ## Objective
 
@@ -58,6 +59,25 @@ Rejected unauthorized relay · failed authentication · AUTH refused before TLS 
 invalid TLS trust · nonexistent recipients · sender-login mismatch · out-of-domain
 submission · SPF/DKIM/DMARC failure cases (B2 matrix) · access attempts to restricted
 services (rspamd UI, MariaDB, Valkey, IMAP 143) from the lab network.
+
+## Carry-forward requirements
+
+Recorded by the Reviewer at Section 1 acceptance (S01-R03). Each is an acceptance criterion
+of the section named, in addition to the table above. None reopens Section 1.
+
+| Section | Requirement |
+|---|---|
+| 2 | NAT adapter has **both** "Connected" and "Connect at power on" disabled in normal operation, proven after a full shutdown and cold boot — not only a live disconnect |
+| 2 | Evidence captured: boot-time NIC state, routing table, repository trust (key fingerprints), isolation proof |
+| 2 | Maintenance windows permit repository access only — no exposure of mail services, no outbound SMTP |
+| 3 | Authoritative answers verified; external recursion verified refused |
+| 4 | Root key **genuinely offline** — not merely encrypted on the running VM's disk |
+| 4 | Intermediate signing key access-restricted and excluded from the repository |
+| 4 | Key custody interaction with VMware snapshots documented (a snapshot taken while a key is present preserves that key) |
+| 4 | Certificate-chain validity and client trust proven |
+| 6 | Submission restrictions proven not bypassable during a NAT maintenance window |
+| 6 | **Correction to S01-R02:** port 587 requires TLS before AUTH and before mail submission. "Before any command but EHLO" overstated it — EHLO, STARTTLS and certain other commands are legitimately allowed pre-TLS. The tests are: AUTH refused before TLS, and MAIL/RCPT refused before TLS |
+| 9 | rspamd → Valkey authentication proven, and stateful features (Bayes, greylisting, rate limiting) proven working — not only service startup |
 
 ## Explicitly out of scope
 

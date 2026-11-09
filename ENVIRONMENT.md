@@ -48,11 +48,18 @@ never change between states:
 | NIC | VMware network | Normal operation | Maintenance window |
 |---|---|---|---|
 | 1 | Lab host-only vmnet | Connected, static address, **no gateway** | Connected |
-| 2 | NAT | **Present, "Connected" unchecked** | Connected (DHCP, default route) |
+| 2 | NAT | **Present; "Connected" and "Connect at power on" both unchecked** | Connected (DHCP, default route) |
 
 A maintenance window (provisioning, updates) is declared in the build log, opened by
 connecting NIC 2 and loading the maintenance nftables set, and closed by disconnecting
 NIC 2, restoring the baseline set, and **re-running the isolation proof**.
+
+The disconnected state is proven after a **full shutdown and cold boot**, not only a live
+disconnect — "Connect at power on" silently reconnects the cable at the next boot.
+
+The maintenance nftables set opens outbound access to package repositories only (HTTP/HTTPS,
+plus name resolution for them). Outbound SMTP stays blocked, and no mail service is exposed
+on the NAT interface, during maintenance as at all other times.
 
 ### Isolation layers
 
