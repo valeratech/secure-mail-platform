@@ -49,8 +49,12 @@ accepted before the next begins. Review rounds are committed as written, includi
 corrections, in [reviews/](reviews/). The stage-boundary commit history is itself evidence
 that the build was staged.
 
-Commit gates follow the portfolio's `WORKFLOW.md`: redact at the source → custom audit →
-pre-commit hooks → CI full-history gitleaks scan.
+Commit gates are adapted from the Linux portfolio hub's
+[`WORKFLOW.md`](https://github.com/valeratech/linux-infrastructure-portfolio/blob/main/WORKFLOW.md):
+redact at the source → custom audit → pre-commit hooks → CI full-history gitleaks scan.
+This repository confirms CI with two corrected forms of that file's §7 check:
+`gh run watch --exit-status`, so a failed run fails the step, and a commit-count match
+that fits the pinned gitleaks output (`N commits scanned`).
 
 ```bash
 pre-commit install            # once
@@ -69,7 +73,7 @@ was actually built and verified.
 | # | Section | State |
 |---|---|---|
 | 1 | Architecture & scope | **Accepted** — [S01-R03](reviews/S01-R03-reviewer.md) |
-| 2 | VMware environment & base OS | Authorized — next |
+| 2 | VMware environment & base OS | In progress |
 | 3 | Internal DNS | |
 | 4 | Private CA & TLS | |
 | 5 | MariaDB & virtual-user schema | |

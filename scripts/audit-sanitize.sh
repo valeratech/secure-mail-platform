@@ -84,7 +84,7 @@ KEEP=()
 for f in "${FILES[@]}"; do
   [ -f "$f" ] || continue
   if file -b --mime "$f" 2>/dev/null | grep -q 'charset=binary'; then
-    report HIGH "binary-committed" "$f" "binary files carry metadata and are blocked by policy — see WORKFLOW.md"
+    report HIGH "binary-committed" "$f" "binary files carry metadata and are blocked by policy — see WORKFLOW.md §4 in valeratech/linux-infrastructure-portfolio"
     continue
   fi
   KEEP+=("$f")
