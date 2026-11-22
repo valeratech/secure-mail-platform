@@ -10,3 +10,9 @@
 # The lab's own reverse-DNS zone for 10.10.10.0/24 (ENVIRONMENT.md, Section 3).
 # Synthetic, RFC1918-derived, and matches the approved lab subnet.
 10.10.10.in-addr.arpa
+
+# Windows OpenSSH programs run from WSL for lab administration (ENVIRONMENT.md, D10).
+# These are executable file names, not domains; the audit's domain pattern reads ".exe"
+# as a top-level domain.
+ssh.exe
+scp.exe

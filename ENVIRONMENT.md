@@ -3,8 +3,9 @@
 Private VMware Workstation Pro lab on a Windows host. Two VMs on a custom host-only network.
 Network-isolated during normal operation; **not** physically air-gapped.
 
-> Installed package versions and repository key fingerprints are recorded here as each
-> section installs them. Until then, the version tables are intentionally empty.
+> Facts are recorded here as each stage builds them. **Section 2 so far:** the host-side lab
+> network (2.1), the verified installation media (2.2), and the mail VM (2.3) are recorded
+> below. Rows for later stages and sections stay empty until they are built.
 
 ## Topology
 
@@ -40,6 +41,30 @@ testing happen from the host over the management path.
 | Disk | 40 GB thin | 20 GB thin |
 | Install profile | Minimal | Minimal |
 
+### Mail VM as built (Section 2.3)
+
+| Item | Value |
+|---|---|
+| Virtual hardware / guest type | Workstation 25H2 / Red Hat Enterprise Linux 10 64-bit |
+| Firmware | **UEFI**. VMware offered no Secure Boot option for this VM (deviation D12). |
+| CPU / RAM | 1 socket × 2 cores / 4 GB |
+| Disk | 40 GB, NVMe, thin, single file (`nvme0n1`); SCSI controller PVSCSI (idle) |
+| Removed devices | USB controller, sound card, printer; 3D acceleration off |
+| Host-guest channels | Shared folders, drag-and-drop, copy/paste and VNC disabled; VMware Tools host time sync off |
+| Install media | AlmaLinux 10.3 minimal ISO (verified in 2.2). The VM was configured to disconnect installation media after setup. Guest-side evidence continued to identify an optical device; media detachment remains unverified and will be checked during Stage 2.5. |
+
+The client VM is recorded here when it is built.
+
+### Mail VM disk layout (D7)
+
+| Volume | Size | Type |
+|---|---|---|
+| `/boot/efi` | 600 MiB | `nvme0n1p1`, vfat |
+| `/boot` | 2 GiB | `nvme0n1p2`, XFS |
+| `/` | 23.5 GiB | LV `almalinux_mail/root`, XFS |
+| swap | 3.91 GiB | LV `almalinux_mail/swap` |
+| **VG free** | **10 GiB** | Reserved in VG `almalinux_mail` for a dedicated `/var/vmail` volume (Section 7) |
+
 ## Network adapters
 
 Both VMs carry **two adapters permanently**, so device enumeration and interface names
@@ -56,6 +81,12 @@ NIC 2, restoring the baseline set, and **re-running the isolation proof**.
 
 The disconnected state is proven after a **full shutdown and cold boot**, not only a live
 disconnect — "Connect at power on" silently reconnects the cable at the next boot.
+
+**Mail VM as built:** NIC 1 → guest `ens160`, NIC 2 → guest `ens192` (VMXNET3). The VM was
+created with *no* network adapter and both were then added explicitly, lab adapter first, so
+a missed step yields no network rather than Internet access and the lab NIC enumerates
+first. While a VM is powered off VMware exposes only "Connect at power on" ("Connected" is a
+runtime control); both are checked together in the 2.8 cold-boot proof.
 
 The maintenance nftables set opens outbound access to package repositories only (HTTP/HTTPS,
 plus name resolution for them). Outbound SMTP stays blocked, and no mail service is exposed
@@ -74,6 +105,18 @@ on the NAT interface, during maintenance as at all other times.
 - IP forwarding disabled on the lab vmnet adapter.
 - VMware DHCP disabled for the lab vmnet.
 
+### Host network as built (Section 2.1)
+
+| Item | Recorded state |
+|---|---|
+| Lab network | Custom host-only **VMnet10**, subnet `10.10.10.0/24`, VMware DHCP **off** |
+| Host adapter | VMware Network Adapter VMnet10, `10.10.10.1/24`, **no gateway** |
+| IPv4 forwarding on that adapter | **Disabled** |
+| Internet Connection Sharing | No evidence of active ICS forwarding through VMnet10 was observed. Interface forwarding was disabled, and no ICS-associated private-interface addressing was identified. The behavioral egress test remains scheduled for Stage 2.8. |
+| Host to guest path | Directly connected on VMnet10; ping to the mail VM returns TTL 64 undecremented (no routed hop) |
+
+The Windows ICS COM query was inconclusive in a non-elevated session and is not relied on.
+
 ## Addressing and names
 
 | Address | Name | Role |
@@ -84,6 +127,38 @@ on the NAT interface, during maintenance as at all other times.
 | `10.10.10.21` | — (no PTR) | Client alias: SPF-unauthorized source for negative tests |
 
 Static addressing via NetworkManager keyfiles. Guests resolve against `10.10.10.10`.
+
+**Mail VM as built:** `ens160` manual `10.10.10.10/24`, no gateway, no DNS server yet (BIND
+arrives in Section 3), IPv6 disabled. Routing table holds only the connected route
+`10.10.10.0/24 dev ens160`; there is **no default route** and no IPv6 route. `ens192` is down
+with no carrier.
+
+## Management access
+
+| Item | Recorded state |
+|---|---|
+| Admin account | `labadmin`, member of `wheel` (D8, D14); root account disabled |
+| SSH client | Windows OpenSSH on the host, run from PowerShell or from WSL as `ssh.exe` (D10). WSL's own `ssh` is not used for the lab: in WSL NAT mode it would depend on the host forwarding into VMnet10, which B1 forbids. |
+| Console | Break-glass and out-of-band checks only |
+| Host key | Mail VM ED25519 host key fingerprint read at the console and matched before the first SSH connection was trusted |
+| Authentication | Password, temporarily; key-only login and `PermitRootLogin no` are configured in 2.5 |
+| Evidence transfer | Captured on the VM, copied to the host with `scp.exe`, and SHA-256 compared on both sides. Piping `ssh.exe` output inside WSL stalls at an invisible password prompt and is not used. |
+
+## Time
+
+| Item | Recorded state |
+|---|---|
+| Time zone | `Etc/UTC` (D13); RTC in UTC |
+| chronyd | Installed, inactive (installer "Network Time" off) |
+| VMware Tools time sync | Off |
+
+**F-01:** VMware seeded the installer's clock with the host's local time, eight hours behind
+UTC. It was corrected by hand before installation.
+
+**F-02:** while the host slept overnight the running VM's clock stopped, leaving it about five
+hours behind. With Tools time sync off and no reachable time source, nothing corrects it.
+This invalidates the D6 assumption that chrony only needs a source during maintenance
+windows; a revised D6 is proposed in 2.5, before Section 4 depends on accurate time.
 
 ## DNS zones
 
@@ -122,8 +197,8 @@ No CA state is ever committed.
 
 | Repository | Used for | Key fingerprint |
 |---|---|---|
-| AlmaLinux 10 BaseOS / AppStream | OS, Postfix, Dovecot, BIND, MariaDB, httpd, PHP, Valkey | *recorded in Section 2* |
-| EPEL 10 | Roundcube, fail2ban, swaks, python3-dkimpy | *recorded in Section 2* |
+| AlmaLinux 10 BaseOS / AppStream | OS, Postfix, Dovecot, BIND, MariaDB, httpd, PHP, Valkey | `EE6D B7B9 8F5B F5ED D9DA 0DE5 DEE5 C11C C2A1 E572`, matched to almalinux.org; it signed the 10.3 ISO checksums in 2.2 |
+| EPEL 10 | Roundcube, fail2ban, swaks, python3-dkimpy | *recorded in Section 2 (first maintenance window)* |
 | rspamd upstream (EL10) | rspamd | *recorded in Section 9* |
 
 `gpgcheck=1` everywhere. No `--nogpgcheck`.
@@ -132,7 +207,7 @@ No CA state is ever committed.
 
 | Component | Version | Recorded in |
 |---|---|---|
-| AlmaLinux | | Section 2 |
+| AlmaLinux | **10.3 (Mauve Lion)**, kernel `6.12.0-264.16.1.el10_3` — 10.3 instead of the locked 10.2 (D11) | Section 2 (2.3) |
 | BIND | | Section 3 |
 | MariaDB | | Section 5 |
 | Postfix | | Section 6 |
@@ -142,6 +217,23 @@ No CA state is ever committed.
 | httpd / PHP | | Section 10 |
 | Roundcube | | Section 10 |
 | fail2ban | | Section 11 |
+
+## Section 2 decisions and deviations
+
+Owner decisions taken during Section 2. They are submitted for the Reviewer's ruling in
+S02-R04 and do not reopen Section 1.
+
+| # | Decision |
+|---|---|
+| D6 | Mail VM is the lab time authority; **revision due in 2.5** after F-02 |
+| D7 | Default LVM/XFS with 10 GiB of the mail VM's volume group left free for `/var/vmail` |
+| D8 | Non-root `wheel` admin, SSH keys, key-only login, root login disabled |
+| D9 | VMs stored on the host's data drive |
+| D10 | Administration from the host via Windows OpenSSH (PowerShell, or WSL through `ssh.exe`) |
+| D11 | **Deviation:** AlmaLinux 10.3 installed (released 2026-11-16), not the locked 10.2 |
+| D12 | **Deviation:** plain UEFI; VMware offered no Secure Boot option |
+| D13 | Time zone UTC |
+| D14 | Admin account `labadmin`, keeping personal names out of evidence |
 
 ## Snapshots
 
@@ -163,4 +255,12 @@ snapshots are taken powered off, on both VMs, with the same name:
 ```
 
 Snapshots are section rollback points. They are **not** backups; the tested
-backup-and-restore process is Section 13.
+backup-and-restore process is Section 13. No Section 2 snapshot has been taken yet; it is
+taken at the end of the section.
+
+## Evidence
+
+Raw evidence — terminal transcripts, command output, screenshots — is held outside the
+repository. Screenshots are not committed while image evidence awaits a Reviewer decision.
+The mail VM's first verification capture (2.3c) is retained offline with SHA-256
+`8239b6b6e476c7f0852d1a136e035acf23c18811acc5579e2f781b0d08a0168a`.
