@@ -4,8 +4,9 @@ Private VMware Workstation Pro lab on a Windows host. Two VMs on a custom host-o
 Network-isolated during normal operation; **not** physically air-gapped.
 
 > Facts are recorded here as each stage builds them. **Section 2 so far:** the host-side lab
-> network (2.1), the verified installation media (2.2), and the mail VM (2.3) are recorded
-> below. Rows for later stages and sections stay empty until they are built.
+> network (2.1), the verified installation media (2.2), the mail VM (2.3), and the client VM
+> (2.4) are recorded below. Rows for later stages and sections stay empty until they are
+> built.
 
 ## Topology
 
@@ -53,7 +54,31 @@ testing happen from the host over the management path.
 | Host-guest channels | Shared folders, drag-and-drop, copy/paste and VNC disabled; VMware Tools host time sync off |
 | Install media | AlmaLinux 10.3 minimal ISO (verified in 2.2). The VM was configured to disconnect installation media after setup. Guest-side evidence continued to identify an optical device; media detachment remains unverified and will be checked during Stage 2.5. |
 
-The client VM is recorded here when it is built.
+### Client VM as built (Section 2.4)
+
+| Item | Value |
+|---|---|
+| Virtual hardware / guest type | Workstation 25H2 / Red Hat Enterprise Linux 10 64-bit |
+| Firmware | **UEFI**; no Secure Boot option offered, as on the mail VM (D12) |
+| CPU / RAM | 1 vCPU / **1.5 GB** (1536 MB). Installed at 2 GB for the graphical installer, then reduced while powered off; the guest reports 1425 MiB usable. |
+| Disk | 20 GB, NVMe, thin, single file (`nvme0n1`); SCSI controller PVSCSI (idle) |
+| Removed devices | USB controller, sound card; 3D acceleration off |
+| Host-guest channels | Shared folders, drag-and-drop and copy/paste disabled; VMware Tools host time sync off |
+| Guest tools | `open-vm-tools` is **not installed** (Minimal install). VMware's "Shut Down Guest" therefore cannot shut the client down cleanly; it is powered off from inside the guest. |
+| Install media | AlmaLinux 10.3 minimal ISO (verified in 2.2). "Connect at power on" unchecked while powered off, then **verified from inside the guest** after a cold boot: `blkid` finds nothing, udev reports no media, and a read fails with "No medium found". The kernel still lists `sr0` with a placeholder size; that is the empty drive, not the ISO. |
+
+### Client VM disk layout
+
+The client stores no mail, so it uses the installer's automatic layout with no reserved
+space.
+
+| Volume | Size | Type |
+|---|---|---|
+| `/boot/efi` | 600 MiB | `nvme0n1p1`, vfat |
+| `/boot` | 2 GiB | `nvme0n1p2`, XFS |
+| `/` | 15.41 GiB | LV `almalinux_client/root`, XFS |
+| swap | 2 GiB | LV `almalinux_client/swap` (sized from the 2 GB install-time RAM) |
+| VG free | 0 | — |
 
 ### Mail VM disk layout (D7)
 
@@ -87,6 +112,11 @@ created with *no* network adapter and both were then added explicitly, lab adapt
 a missed step yields no network rather than Internet access and the lab NIC enumerates
 first. While a VM is powered off VMware exposes only "Connect at power on" ("Connected" is a
 runtime control); both are checked together in the 2.8 cold-boot proof.
+
+**Client VM as built:** the same pattern: created with no adapter, lab adapter added first,
+NIC 1 → `ens160` on VMnet10 with "Connect at power on" checked, NIC 2 → `ens192` on NAT with
+"Connect at power on" unchecked. After a cold boot the guest reports `ens192` unavailable
+(no carrier).
 
 The maintenance nftables set opens outbound access to package repositories only (HTTP/HTTPS,
 plus name resolution for them). Outbound SMTP stays blocked, and no mail service is exposed
@@ -133,6 +163,13 @@ arrives in Section 3), IPv6 disabled. Routing table holds only the connected rou
 `10.10.10.0/24 dev ens160`; there is **no default route** and no IPv6 route. `ens192` is down
 with no carrier.
 
+**Client VM as built:** `ens160` manual `10.10.10.20/24` (primary) and `10.10.10.21/24`
+(kernel-flagged `secondary`), no gateway, no DNS server yet, IPv6 disabled
+(`disable_ipv6 = 1` on `ens160`). The routing table holds only the connected
+`10.10.10.0/24` routes, one per source address; there is **no default route** and no IPv6
+route. `ip route get 10.10.10.10` selects source `10.10.10.20`, so traffic leaves from `.20`
+unless a test binds `.21` explicitly. `ens192` is down with no carrier.
+
 ## Management access
 
 | Item | Recorded state |
@@ -140,20 +177,23 @@ with no carrier.
 | Admin account | `labadmin`, member of `wheel` (D8, D14); root account disabled |
 | SSH client | Windows OpenSSH on the host, run from PowerShell or from WSL as `ssh.exe` (D10). WSL's own `ssh` is not used for the lab: in WSL NAT mode it would depend on the host forwarding into VMnet10, which B1 forbids. |
 | Console | Break-glass and out-of-band checks only |
-| Host key | Mail VM ED25519 host key fingerprint read at the console and matched before the first SSH connection was trusted |
-| Authentication | Password, temporarily; key-only login and `PermitRootLogin no` are configured in 2.5 |
-| Evidence transfer | Captured on the VM, copied to the host with `scp.exe`, and SHA-256 compared on both sides. Piping `ssh.exe` output inside WSL stalls at an invisible password prompt and is not used. |
+| Host key | Each VM's ED25519 host key fingerprint was read at the console and matched before the first SSH connection was trusted (mail VM in 2.3, client VM in 2.4) |
+| Authentication | Password, temporarily; key-only login and `PermitRootLogin no` are configured on both VMs in 2.5 |
+| Evidence transfer | Captured on the VM, copied to the host with Windows OpenSSH `scp` (from PowerShell, or `scp.exe` from WSL), and SHA-256 compared on both sides. Piping `ssh.exe` output inside WSL stalls at an invisible password prompt and is not used. |
 
 ## Time
 
 | Item | Recorded state |
 |---|---|
-| Time zone | `Etc/UTC` (D13); RTC in UTC |
-| chronyd | Installed, inactive (installer "Network Time" off) |
-| VMware Tools time sync | Off |
+| Time zone | `Etc/UTC` (D13) on both VMs; RTC in UTC |
+| chronyd | Installed, inactive on both VMs (installer "Network Time" off) |
+| VMware Tools time sync | Off in both VMs' settings; the client has no VMware Tools installed at all |
 
-**F-01:** VMware seeded the installer's clock with the host's local time, eight hours behind
-UTC. It was corrected by hand before installation.
+**F-01:** The installer clock was eight hours behind UTC on both the mail VM and client VM,
+and was manually corrected before installation. The client's first installed-system boot and
+subsequent cold boot showed correct UTC despite `open-vm-tools` being absent. The underlying
+cause and recurrence conditions remain unconfirmed. Investigation and the D6
+time-synchronization revision are assigned to Stage 2.5.
 
 **F-02:** while the host slept overnight the running VM's clock stopped, leaving it about five
 hours behind. With Tools time sync off and no reachable time source, nothing corrects it.
@@ -207,7 +247,7 @@ No CA state is ever committed.
 
 | Component | Version | Recorded in |
 |---|---|---|
-| AlmaLinux | **10.3 (Mauve Lion)**, kernel `6.12.0-264.16.1.el10_3` — 10.3 instead of the locked 10.2 (D11) | Section 2 (2.3) |
+| AlmaLinux | **10.3 (Mauve Lion)**, kernel `6.12.0-264.16.1.el10_3` on both VMs — 10.3 instead of the locked 10.2 (D11) | Section 2 (2.3, 2.4) |
 | BIND | | Section 3 |
 | MariaDB | | Section 5 |
 | Postfix | | Section 6 |
@@ -262,5 +302,10 @@ taken at the end of the section.
 
 Raw evidence — terminal transcripts, command output, screenshots — is held outside the
 repository. Screenshots are not committed while image evidence awaits a Reviewer decision.
-The mail VM's first verification capture (2.3c) is retained offline with SHA-256
-`8239b6b6e476c7f0852d1a136e035acf23c18811acc5579e2f781b0d08a0168a`.
+Verification captures are retained offline with these SHA-256 values:
+
+| Capture | SHA-256 |
+|---|---|
+| Mail VM first verification (2.3c) | `8239b6b6e476c7f0852d1a136e035acf23c18811acc5579e2f781b0d08a0168a` |
+| Client VM first verification (2.4c) | `bb17b96aaa339c18dc3f2be1d067661bf8f4e85266ed55febb0410111f26136b` |
+| Client VM supplement: optical media, source address (2.4c) | `407280bd641408b57dac43fe6c7fb99e306a84b61ca82dd233b0dd50b3855dc1` |
